@@ -1,4 +1,6 @@
-#!/usr/bin/env python3
+"""
+Notepad TabState parser by @aniqfakhrul.
+"""
 from datetime import datetime, timezone
 from enum import Enum
 from binascii import hexlify
