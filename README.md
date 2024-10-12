@@ -4,3 +4,15 @@ The TabState Parser is a Python script designed to parse the content of "bin" fi
 
 > [!note]
 > The structure names are not documented by microsoft. So i just put a custom name according to my liking. No hate pls
+
+## Sample Usage
+- Auto parse unsaved and saved state file
+```python
+tsp = TabStateParser(
+	file_path="path/to/file.bin",
+	raw=True
+)
+file_struct = tsp.parse()
+```
+
+- Parse saved state file

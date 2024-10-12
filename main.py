@@ -73,18 +73,10 @@ class TabStateParser:
 	"""
 	Notepad Tabstate file parser object. Inspired by https://u0041.co/posts/articals/exploring-windows-artifacts-notepad-files/
 	"""
-	def __init__(self, file_path, raw=False):
+	def __init__(self, file_path=None, raw=False):
 		self.file_path = file_path
 		self.file_stream = open(self.file_path, "rb")
 		self.raw = raw
-
-		fHeader = self.file_stream.read(5)
-		self.signature = fHeader[:2]
-		if not self.valid_header(self.signature):
-			raise Exception("Invalid file signature")
-
-		self.typeFlag = fHeader[3]
-		self.file_stream.seek(0)
 
 	# Read the LEB128 encoded integer from a stream
 	def read_leb128_unsigned(self, stream) -> int:
@@ -146,25 +138,33 @@ class TabStateParser:
 			unknown0=unknown0 if self.raw else unknown0.decode("utf-8")
 		)
 
-	def parse_saved(self):
-		signature = self.file_stream.read(2)
-		typeFlag = self.read_leb128_unsigned(self.file_stream)
-		seqNumber = self.read_leb128_unsigned(self.file_stream)
-		fPathLength = self.read_leb128_unsigned(self.file_stream)
-		fPathBytes = self.file_stream.read(fPathLength * 2)
-		fSize = self.read_leb128_unsigned(self.file_stream)
-		encoding = self.file_stream.read(1)
-		crType = self.file_stream.read(1)
-		timestamp = self.read_leb128_unsigned(self.file_stream)
-		sha256Hash = self.file_stream.read(32)
-		unk0 = self.file_stream.read(2)
-		cursorSelectionStart = self.read_leb128_unsigned(self.file_stream)
-		cursorSelectionEnd = self.read_leb128_unsigned(self.file_stream)
+	def parse_saved(self, file_stream=None):
+		if not file_stream:
+			file_stream = self.file_stream
+
+		signature = file_stream.read(2)
+		if not self.valid_header(signature):
+			raise Exception("Invalid file signature")
+
+		seqNumber = self.read_leb128_unsigned(file_stream)
+		typeFlag = self.read_leb128_unsigned(file_stream)
+		if typeFlag != 1:
+			raise Exception("Not a saved file")
+		fPathLength = self.read_leb128_unsigned(file_stream)
+		fPathBytes = file_stream.read(fPathLength * 2)
+		fSize = self.read_leb128_unsigned(file_stream)
+		encoding = file_stream.read(1)
+		crType = file_stream.read(1)
+		timestamp = self.read_leb128_unsigned(file_stream)
+		sha256Hash = file_stream.read(32)
+		unk0 = file_stream.read(2)
+		cursorSelectionStart = self.read_leb128_unsigned(file_stream)
+		cursorSelectionEnd = self.read_leb128_unsigned(file_stream)
 		configBlock = self.parse_config_block()
-		contentCharLength = self.read_leb128_unsigned(self.file_stream)
-		fContentBytes = self.file_stream.read(contentCharLength * 2)
-		containUnsavedData = self.file_stream.read(1)
-		crc32Checksum = self.file_stream.read(4)
+		contentCharLength = self.read_leb128_unsigned(file_stream)
+		fContentBytes = file_stream.read(contentCharLength * 2)
+		containUnsavedData = file_stream.read(1)
+		crc32Checksum = file_stream.read(4)
 
 		return SavedTab(
 			signature=signature if self.raw else signature.decode("utf-8"),
@@ -187,19 +187,27 @@ class TabStateParser:
 			checksum=crc32Checksum if self.raw else hexlify(crc32Checksum).decode("utf-8"),
 		)
 
-	def parse_unsaved(self):
-		signature = self.file_stream.read(2)
-		typeFlag = self.read_leb128_unsigned(self.file_stream)
-		seqNumber = self.read_leb128_unsigned(self.file_stream)
-		fPathLength = self.read_leb128_unsigned(self.file_stream)
-		unk1 = self.file_stream.read(1)
-		cursorSelectionStart = self.read_leb128_unsigned(self.file_stream)
-		cursorSelectionEnd = self.read_leb128_unsigned(self.file_stream)
+	def parse_unsaved(self, file_stream=None):
+		if not file_stream:
+			file_stream = self.file_stream
+
+		signature = file_stream.read(2)
+		if not self.valid_header(signature):
+			raise Exception("Invalid file signature")
+
+		seqNumber = self.read_leb128_unsigned(file_stream)
+		typeFlag = self.read_leb128_unsigned(file_stream)
+		if typeFlag != 0:
+			raise Exception("Not an unsaved file")
+		fPathLength = self.read_leb128_unsigned(file_stream)
+		unk1 = file_stream.read(1)
+		cursorSelectionStart = self.read_leb128_unsigned(file_stream)
+		cursorSelectionEnd = self.read_leb128_unsigned(file_stream)
 		configBlock = self.parse_config_block()
-		fContentLength = self.read_leb128_unsigned(self.file_stream)
-		fContentBytes = self.file_stream.read(fContentLength * 2)
-		containUnsavedData = self.file_stream.read(1)
-		crc32Checksum = self.file_stream.read(4)
+		fContentLength = self.read_leb128_unsigned(file_stream)
+		fContentBytes = file_stream.read(fContentLength * 2)
+		containUnsavedData = file_stream.read(1)
+		crc32Checksum = file_stream.read(4)
 
 		return UnsavedTab(
 			signature=signature if self.raw else signature.decode("utf-8"),
@@ -220,9 +228,17 @@ class TabStateParser:
 		Parsing "UnsavedTab" and "SavedTab" TabState structure.
 		Credits to https://u0041.co/posts/articals/exploring-windows-artifacts-notepad-files/
 		"""
-		if self.typeFlag == 0: #Unsaved - buffer file
+		fHeader = self.file_stream.read(5)
+		signature = fHeader[:2]
+		if not self.valid_header(signature):
+			raise Exception("Invalid file signature")
+
+		typeFlag = fHeader[3]
+		self.file_stream.seek(0)
+
+		if typeFlag == 0:
 			return self.parse_unsaved()
-		elif self.typeFlag == 1: #Saved - buffer file
+		elif typeFlag == 1:
 			return self.parse_saved()
 		else:
 			raise Exception("Invalid buffer file type")
