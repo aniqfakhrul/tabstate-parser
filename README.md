@@ -15,4 +15,18 @@ tsp = TabStateParser(
 file_struct = tsp.parse()
 ```
 
-- Parse saved state file
+- You can actually overwrite parse...() function with other file stream
+```python
+tsp = TabStateParser(
+	file_path="path/to/file.bin",
+	raw=True
+)
+new_stream = open("/path/to/new/file.bin", "rb")
+file_struct = tsp.parse_saved(
+				file_stream=new_stream
+			  )
+```
+
+## Credits
+- https://u0041.co/posts/articals/exploring-windows-artifacts-notepad-files/
+- https://u0041.co/posts/articals/exploring-windows-artifacts-notepad-files/
