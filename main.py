@@ -202,7 +202,7 @@ class TabStateParser:
 		if typeFlag != 0:
 			raise Exception("Not an unsaved file")
 		fPathLength = self.read_leb128_unsigned(file_stream)
-		unk1 = file_stream.read(1)
+		unknown1 = b'' #file_stream.read(1) # KIV: some of the unsaved tab file has this bytes
 		cursorSelectionStart = self.read_leb128_unsigned(file_stream)
 		cursorSelectionEnd = self.read_leb128_unsigned(file_stream)
 		configBlock = self.parse_config_block()
@@ -215,7 +215,7 @@ class TabStateParser:
 			signature=signature if self.raw else signature.decode("utf-8"),
 			sequence_number=seqNumber,
 			type_flag=typeFlag if self.raw else bool(typeFlag),
-			unknown1=unk1,
+			unknown1=unknown1,
 			selection_start=cursorSelectionStart,
 			selection_end=cursorSelectionEnd,
 			config_block=configBlock,
