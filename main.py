@@ -20,11 +20,11 @@ class CarriageReturn(Enum):
 
 @dataclass
 class UnsavedChunk:
-	cursor_position: bytes
-	deletion_number: bytes
-	addition_number: bytes
-	chars: bytes
-	checksum: bytes
+	cursor_position: bytes = b''
+	deletion_number: bytes = b''
+	addition_number: bytes = b''
+	chars: bytes = b''
+	crc32Checksum: bytes = b''
 
 @dataclass
 class ConfigBlock:
@@ -54,7 +54,7 @@ class SavedTab:
 	content: bytes
 	contain_unsaved_data: bool
 	checksum: bytes
-	#unsaved_chunks: UnsavedChunk
+	unsaved_chunks: UnsavedChunk
 
 @dataclass
 class UnsavedTab:
@@ -69,7 +69,7 @@ class UnsavedTab:
 	content: bytes
 	contain_unsaved_data: bool
 	checksum: bytes
-	#unsaved_chunks: UnsavedChunk
+	unsaved_chunks: UnsavedChunk
 
 class TabStateParser:
 	"""
@@ -108,18 +108,21 @@ class TabStateParser:
 		return header_bytes == b'NP'
 
 	def parse_unsaved_chunk(self) -> UnsavedChunk:
-		cursor_position = self.read_leb128_unsigned(self.file_stream)
-		deletion_number = self.read_leb128_unsigned(self.file_stream)
-		addition_number = self.read_leb128_unsigned(self.file_stream)
-		chars = self.file_stream.read(addition_number * 2)
-		checksum = self.file_stream.read(4)
-		return UnsavedChunk(
-			cursor_position=cursor_position,
-			deletion_number=deletion_number,
-			addition_number=addition_number,
-			chars=chars,
-			checksum=checksum
-		)
+		try:
+			cursor_position = self.read_leb128_unsigned(self.file_stream)
+			deletion_number = self.read_leb128_unsigned(self.file_stream)
+			addition_number = self.read_leb128_unsigned(self.file_stream)
+			chars = self.file_stream.read(addition_number * 2)
+			crc32Checksum = self.file_stream.read(4)
+			return UnsavedChunk(
+				cursor_position=cursor_position,
+				deletion_number=deletion_number,
+				addition_number=addition_number,
+				chars=chars,
+				crc32Checksum=crc32Checksum
+			)
+		except EOFError:
+			return UnsavedChunk()
 
 	def parse_config_block(self) -> ConfigBlock:
 		word_wrap = self.file_stream.read(1)
@@ -167,6 +170,7 @@ class TabStateParser:
 		fContentBytes = file_stream.read(contentCharLength * 2)
 		containUnsavedData = file_stream.read(1)
 		crc32Checksum = file_stream.read(4)
+		unsaved_chunks = self.parse_unsaved_chunk()
 
 		return SavedTab(
 			signature=signature if self.raw else signature.decode("utf-8"),
@@ -187,6 +191,7 @@ class TabStateParser:
 			content=fContentBytes if self.raw else fContentBytes.decode("utf-16-le"),
 			contain_unsaved_data=containUnsavedData if self.raw else bool(containUnsavedData),
 			checksum=crc32Checksum if self.raw else hexlify(crc32Checksum).decode("utf-8"),
+			unsaved_chunks=unsaved_chunks
 		)
 
 	def parse_unsaved(self, file_stream=None):
@@ -210,6 +215,7 @@ class TabStateParser:
 		fContentBytes = file_stream.read(fContentLength * 2)
 		containUnsavedData = file_stream.read(1)
 		crc32Checksum = file_stream.read(4)
+		unsaved_chunks = self.parse_unsaved_chunk()
 
 		return UnsavedTab(
 			signature=signature if self.raw else signature.decode("utf-8"),
@@ -223,6 +229,7 @@ class TabStateParser:
 			content=fContentBytes if self.raw else fContentBytes.decode("utf-16-le"),
 			contain_unsaved_data=containUnsavedData if self.raw else bool(containUnsavedData),
 			checksum=crc32Checksum if self.raw else hexlify(crc32Checksum).decode("utf-8"),
+			unsaved_chunks=unsaved_chunks
 		)
 
 	def parse(self):
